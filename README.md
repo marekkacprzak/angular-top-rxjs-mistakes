@@ -5,6 +5,7 @@ This project was generated with [Angular CLI](https://github.com/angular/angular
 # Development mistake:
 1. Nested subscription:
 
+```typescript
   searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     debounceTime(300),
     distinctUntilChanged(),
@@ -25,15 +26,19 @@ This project was generated with [Angular CLI](https://github.com/angular/angular
           this.users = users;
         });
       });
+```typescript
 
 Should be:
+```typescript
   this.searchConfig$
       .pipe(
         switchMap((searchConfig) => this.usersService.findUsers(searchConfig)),
         takeUntilDestroyed(this.destroyRef))
       .subscribe((users) => this.users = users);
+```typescript
 
 2.Wrong usage of takeUntil for unsub.
+```typescript
   this.searchConfig$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((searchConfig) => {
@@ -41,26 +46,32 @@ Should be:
           this.users = users;
         });
       });
+```typescript
       or
+```typescript
   this.searchConfig$
       .pipe(
         takeUntilDestroyed(this.destroyRef))
         switchMap((searchConfig) => this.usersService.findUsers(searchConfig)),
       .subscribe((users) => this.users = users);
+```typescript
       
 takeUntil handles unsubscription only for the operators located before takeUntil - so if the component will be destroy if findUsers is panding state - it should not be canceled it does not unsubsctiptions downstream...
 
 Should be:
+```typescript
   this.searchConfig$
       .pipe(
         takeUntilDestroyed(this.destroyRef))
         switchMap((searchConfig) => this.usersService.findUsers(searchConfig)),
       .subscribe((users) => this.users = users);
+```typescript
 
 you can configure lint rule: no-unsafe-takeuntil
 
 3. Manual subscription in components
 In component there is better way to deliver data from observable to the component view - asyncPipe
+```typescript
   this.searchConfig$
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((searchConfig) => {
@@ -68,17 +79,23 @@ In component there is better way to deliver data from observable to the componen
           this.users = users;
         });
       });
+```typescript
 
 Should be:
+```typescript
     users = toSignal(this.searchConfig$.pipe(
     switchMap((searchConfig) => this.usersService.findUsers(searchConfig))))
+```typescript
 or in older Angular version AsyncPipe:
 
+```typescript
 users$ = this.searchConfig$.pipe(
     switchMap((searchConfig) => this.usersService.findUsers(searchConfig)),
     shareReplay(1)
   )
+```typescript
 
+```typescript
 imports: [ReactiveFormsModule, AsyncPipe], 
   <p>
     Found <b>{{ (users$ | async)?.length }}</b> Users
@@ -88,24 +105,30 @@ imports: [ReactiveFormsModule, AsyncPipe],
       <li class="card">{{ user.name }}</li>
     }
   </ul>
+```typescript
 
 4. Executing Observable logic multiple times
 new subscripotion on the view (async) trigers execute of the observable - cold observable
 group rx operator - shareReplay(1) - how many result should be replay to new subscribers
  instead of:
+```typescript
 users$ = this.searchConfig$.pipe(
     switchMap((searchConfig) => this.usersService.findUsers(searchConfig))
   )
+```typescript
 
 Should be
+```typescript
 users$ = this.searchConfig$.pipe(
     switchMap((searchConfig) => this.usersService.findUsers(searchConfig)),
     shareReplay(1)
   )  
+```typescript
 
 5. Improper usage of distinctUntilChanged
 distinctUntilChanged work proper for pure value not for the object - valueChanges is the {} so {} === {} return always false if new value can change to distinctUntilChanged( (prev, curr) => prev.userName !== curr.userName) or distinctUntilKeyChanged('userName')
 
+```typescript
 searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     debounceTime(300),
     distinctUntilChanged(),
@@ -118,9 +141,11 @@ searchConfig$ = this.searchConfigForm.valueChanges.pipe(
       return trimmedConfig;
     })
   );
+```typescript
 
 Should be:
    
+```typescript
 searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     debounceTime(300),
     distinctUntilKeyChanged('userName'),
@@ -133,10 +158,12 @@ searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     }),
     tap((trimmedConfig) => localStorage.setItem('searchConfig', JSON.stringify(trimmedConfig)))
   );
+```typescript
 
 6. Side effects in wrong place
 when function modyfing outside our scope - in our example localStorage is outside - so side effect - it should be in tap region       
 
+```typescript
 searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     debounceTime(300),
     distinctUntilKeyChanged('userName'),
@@ -149,9 +176,11 @@ searchConfig$ = this.searchConfigForm.valueChanges.pipe(
       return trimmedConfig;
     })
   );
+```typescript
 
 Should be:
-   
+
+```typescript   
 searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     debounceTime(300),
     distinctUntilKeyChanged('userName'),
@@ -164,6 +193,8 @@ searchConfig$ = this.searchConfigForm.valueChanges.pipe(
     }),
     tap((trimmedConfig) => localStorage.setItem('searchConfig', JSON.stringify(trimmedConfig)))
   );
+```typescript   
+
 ## Development server
 
 Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
